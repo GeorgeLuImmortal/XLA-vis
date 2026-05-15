@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XLA 认知大模型 — 技术全景关系图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans SC', 'Inter', sans-serif;
+    background: #0a0a1a;
+    color: #e0e0e0;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  canvas#bg {
+    position: fixed;
+    top: 0; left: 0;
+    z-index: 0;
+    width: 100%; height: 100%;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── central XLA hub ── */
+  .xla-core {
+    position: absolute;
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #ff8c00, #e65100);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 60px rgba(255,140,0,.45), 0 0 120px rgba(255,140,0,.2);
+    z-index: 10;
+    cursor: pointer;
+    transition: transform .3s, box-shadow .3s;
+    animation: pulse-core 3s ease-in-out infinite;
+  }
+  .xla-core:hover { transform: scale(1.08); box-shadow: 0 0 80px rgba(255,140,0,.6); }
+  .xla-core h1 { font-size: 32px; font-weight: 700; color: #fff; letter-spacing: 4px; }
+  .xla-core p { font-size: 11px; color: rgba(255,255,255,.85); margin-top: 2px; text-align: center; line-height: 1.3; }
+
+  @keyframes pulse-core {
+    0%, 100% { box-shadow: 0 0 60px rgba(255,140,0,.45), 0 0 120px rgba(255,140,0,.2); }
+    50% { box-shadow: 0 0 80px rgba(255,140,0,.6), 0 0 160px rgba(255,140,0,.3); }
+  }
+
+  /* ── layer rings ── */
+  .layer-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1.5px dashed;
+    opacity: .25;
+    pointer-events: none;
+  }
+  .ring-x { width: 420px; height: 420px; border-color: #4fc3f7; }
+  .ring-l { width: 420px; height: 420px; border-color: #ab47bc; }
+  .ring-a { width: 420px; height: 420px; border-color: #66bb6a; }
+
+  /* ── layer labels ── */
+  .layer-label {
+    position: absolute;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    opacity: .5;
+    pointer-events: none;
+    text-transform: uppercase;
+  }
+
+  /* ── connection lines (SVG) ── */
+  svg.connections {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 2;
+  }
+  svg.connections line {
+    stroke-width: 2;
+    stroke-dasharray: 8 4;
+    opacity: .4;
+  }
+  svg.connections line.active {
+    opacity: .9;
+    stroke-width: 3;
+    stroke-dasharray: none;
+    filter: drop-shadow(0 0 6px currentColor);
+  }
+
+  /* ── work nodes ── */
+  .work-node {
+    position: absolute;
+    width: 140px;
+    border-radius: 16px;
+    padding: 16px 14px;
+    text-align: center;
+    cursor: pointer;
+    z-index: 5;
+    transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s, opacity .5s;
+    opacity: 0;
+    transform: scale(.6);
+  }
+  .work-node.visible { opacity: 1; transform: scale(1); }
+  .work-node:hover { transform: scale(1.08) !important; }
+
+  .work-node .icon { font-size: 28px; margin-bottom: 6px; }
+  .work-node .name { font-size: 15px; font-weight: 700; color: #fff; }
+  .work-node .layer-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 8px;
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+  .work-node .desc {
+    font-size: 11px;
+    color: rgba(255,255,255,.7);
+    margin-top: 6px;
+    line-height: 1.4;
+  }
+
+  /* layer-specific colors */
+  .node-x { background: linear-gradient(135deg, rgba(33,150,243,.15), rgba(33,150,243,.05)); border: 1.5px solid rgba(33,150,243,.4); }
+  .node-x:hover { box-shadow: 0 0 30px rgba(33,150,243,.3); }
+  .node-x .layer-tag { background: rgba(33,150,243,.25); color: #4fc3f7; }
+
+  .node-l { background: linear-gradient(135deg, rgba(171,71,188,.15), rgba(171,71,188,.05)); border: 1.5px solid rgba(171,71,188,.4); }
+  .node-l:hover { box-shadow: 0 0 30px rgba(171,71,188,.3); }
+  .node-l .layer-tag { background: rgba(171,71,188,.25); color: #ce93d8; }
+
+  .node-a { background: linear-gradient(135deg, rgba(102,187,106,.15), rgba(102,187,106,.05)); border: 1.5px solid rgba(102,187,106,.4); }
+  .node-a:hover { box-shadow: 0 0 30px rgba(102,187,106,.3); }
+  .node-a .layer-tag { background: rgba(102,187,106,.25); color: #81c784; }
+
+  /* ── detail panel ── */
+  .detail-panel {
+    position: fixed;
+    right: -480px;
+    top: 0;
+    width: 440px;
+    height: 100vh;
+    background: rgba(15,15,30,.97);
+    border-left: 1px solid rgba(255,255,255,.08);
+    backdrop-filter: blur(20px);
+    z-index: 100;
+    transition: right .45s cubic-bezier(.22,1,.36,1);
+    overflow-y: auto;
+    padding: 40px 32px;
+  }
+  .detail-panel.open { right: 0; }
+  .detail-panel .close-btn {
+    position: absolute;
+    top: 16px; right: 16px;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.08);
+    border: none;
+    color: #aaa;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s;
+  }
+  .detail-panel .close-btn:hover { background: rgba(255,255,255,.15); color: #fff; }
+  .detail-panel h2 { font-size: 24px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+  .detail-panel .subtitle { font-size: 13px; color: rgba(255,255,255,.5); margin-bottom: 20px; }
+  .detail-panel .section-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255,255,255,.4);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin: 20px 0 8px;
+  }
+  .detail-panel .body-text {
+    font-size: 14px;
+    line-height: 1.8;
+    color: rgba(255,255,255,.8);
+  }
+  .detail-panel .highlight {
+    display: inline;
+    background: rgba(255,140,0,.15);
+    color: #ffb74d;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-weight: 500;
+  }
+  .detail-panel .stat-row {
+    display: flex; gap: 12px; margin-top: 12px; flex-wrap: wrap;
+  }
+  .detail-panel .stat {
+    flex: 1; min-width: 120px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .detail-panel .stat .val { font-size: 22px; font-weight: 700; color: #ffb74d; }
+  .detail-panel .stat .label { font-size: 11px; color: rgba(255,255,255,.45); margin-top: 2px; }
+
+  /* ── flow arrows on canvas ── */
+  .flow-label {
+    position: absolute;
+    font-size: 10px;
+    color: rgba(255,255,255,.35);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  /* ── title bar ── */
+  .title-bar {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%;
+    padding: 20px 32px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    pointer-events: none;
+  }
+  .title-bar .logo {
+    width: 28px; height: 28px;
+    background: #ff8c00;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 12px; color: #fff;
+  }
+  .title-bar .title-text { font-size: 16px; font-weight: 600; color: rgba(255,255,255,.8); }
+  .title-bar .badge {
+    font-size: 10px;
+    background: rgba(255,140,0,.2);
+    color: #ffb74d;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+
+  /* ── bottom legend ── */
+  .legend {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 24px;
+    z-index: 50;
+    pointer-events: none;
+  }
+  .legend-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: rgba(255,255,255,.5);
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+  }
+
+  /* ── animation intro ── */
+  .intro-overlay {
+    position: fixed;
+    inset: 0;
+    background: #0a0a1a;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity .8s;
+  }
+  .intro-overlay.hidden { opacity: 0; pointer-events: none; }
+  .intro-overlay h1 { font-size: 48px; font-weight: 700; color: #ff8c00; letter-spacing: 8px; }
+  .intro-overlay p { font-size: 16px; color: rgba(255,255,255,.5); margin-top: 8px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Background particles -->
+<canvas id="bg"></canvas>
+
+<!-- Intro overlay -->
+<div class="intro-overlay" id="intro">
+  <h1>XLA</h1>
+  <p>小米具身智能认知大模型 · 技术全景</p>
+</div>
+
+<!-- Title bar -->
+<div class="title-bar">
+  <div class="logo">Mi</div>
+  <div class="title-text">XLA 认知大模型 — 技术全景关系图</div>
+  <div class="badge">5 Projects</div>
+</div>
+
+<!-- Main scene -->
+<div class="container" id="scene">
+  <!-- SVG connections -->
+  <svg class="connections" id="connSvg"></svg>
+
+  <!-- Central core -->
+  <div class="xla-core" id="core" onclick="showCoreDetail()">
+    <h1>XLA</h1>
+    <p>认知大模型<br>X · L · A</p>
+  </div>
+
+  <!-- Work nodes will be created by JS -->
+</div>
+
+<!-- Bottom legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#4fc3f7"></div>X 层 · 感知输入</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ab47bc"></div>L 层 · 语言推理</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#66bb6a"></div>A 层 · 行为输出</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#ff8c00"></div>XLA 核心架构</div>
+</div>
+
+<!-- Detail panel -->
+<div class="detail-panel" id="detailPanel">
+  <button class="close-btn" onclick="closeDetail()">✕</button>
+  <div id="detailContent"></div>
+</div>
+
+<script>
+// ── Data ──
+const works = [
+  {
+    id: 'spatiolm',
+    name: 'SpatioLM',
+    icon: '🌐',
+    layer: 'X',
+    layerLabel: 'X · 空间感知',
+    angle: -110,   // degrees from center
+    radius: 240,
+    colorLine: '#4fc3f7',
+    nodeClass: 'node-x',
+    shortDesc: '纯视觉路线激发VLM内在空间智能',
+    detail: {
+      title: 'SpatioLM',
+      subtitle: '赋予VLM物理空间智能 · ICML 2026',
+      problem: '现有VLM对物理空间（距离、方位、相对位置）理解薄弱，传统方案依赖外部3D先验（深度图、点云），部署成本高。',
+      method: '冻结VLM骨干，插入即插即用的<span class="highlight">Spatio-Vision Module</span>：从Vision Encoder中间层提取几何感知token，通过零初始化投影注入LLM。使用Frame/Global Attention交替 + Dual DPT Head（深度图+射线图）辅助监督 + Depth Anything V3蒸馏。',
+      role: '为X层提供空间增强的视觉表征，让后续推理和动作规划拥有"尺度感"和"方位感"——具身智能的基础能力。',
+      stats: [
+        { val: '71.6', label: 'VSI-Bench（首个>70）' },
+        { val: 'RGB-only', label: '无需3D传感器' },
+        { val: '即插即用', label: '冻结骨干不破坏对齐' }
+      ]
+    }
+  },
+  {
+    id: 'gda',
+    name: 'GDA',
+    icon: '🔒',
+    layer: 'X',
+    layerLabel: 'X · 深度融合',
+    angle: -70,
+    radius: 240,
+    colorLine: '#4fc3f7',
+    nodeClass: 'node-x',
+    shortDesc: '门控残差融合3D几何，保真VL对齐',
+    detail: {
+      title: 'GDA (Gated Depth Attention)',
+      subtitle: '保真式深度融合 · NeurIPS 2026',
+      problem: '无条件注入3D几何信息会破坏预训练的视觉-语言对齐，导致VLM在通用任务（VQA、OCR）上性能下降。3D监督越强 ≠ VLM越好用。',
+      method: '将几何信息视为RGB token的<span class="highlight">条件残差</span>：Latent Depth Branch蒸馏DA3教师 → Cross-Attention检索几何信息 → <span class="highlight">Image-conditioned Gate</span>逐token决定是否注入。门控零初始化启动，几何信息逐步"被信任"。',
+      role: '与SpatioLM互补构成X层"双保险"。SpatioLM从内部激发空间智能，GDA从外部安全注入。核心警示：3D增强应是选择性精细化，非强制替换。',
+      stats: [
+        { val: '门控机制', label: '选择性融合' },
+        { val: 'RGB-only', label: '推理无需深度传感器' },
+        { val: '全面提升', label: 'VLM + VLA双重验证' }
+      ]
+    }
+  },
+  {
+    id: 'onevl',
+    name: 'OneVL',
+    icon: '⚡',
+    layer: 'L',
+    layerLabel: 'L · Latent CoT',
+    angle: 180,
+    radius: 260,
+    colorLine: '#ab47bc',
+    nodeClass: 'node-l',
+    shortDesc: '一步潜空间推理，世界模型监督',
+    detail: {
+      title: 'OneVL',
+      subtitle: '一步Latent推理与规划 · arXiv 2604',
+      problem: '显式CoT自回归生成延迟不可接受；现有Latent CoT压缩为纯语言潜向量，丢失驾驶场景的因果动力学信息，始终不如显式CoT。',
+      method: '双模态辅助解码器监督：<span class="highlight">Visual Auxiliary Decoder</span>从视觉潜变量重建未来帧（世界模型），<span class="highlight">Language Auxiliary Decoder</span>重建CoT文本。三阶段训练渐进对齐。推理时丢弃解码器，潜token一次性prefill。',
+      role: 'XLA L层"Latent CoT"的核心实现。证明压缩不是妥协——世界模型监督迫使潜空间编码因果结构，推理质量反超显式CoT。',
+      stats: [
+        { val: '5.4%', label: '延迟仅为显式CoT的' },
+        { val: '4/4', label: 'Benchmark全面超越' },
+        { val: '首个', label: 'Latent CoT超越显式CoT' }
+      ]
+    }
+  },
+  {
+    id: 'lta',
+    name: 'LTA',
+    icon: '🔀',
+    layer: 'L',
+    layerLabel: 'L · Action Token',
+    angle: 30,
+    radius: 260,
+    colorLine: '#ab47bc',
+    nodeClass: 'node-l',
+    shortDesc: '连续扩散并行生成，突破AR瓶颈',
+    detail: {
+      title: 'LTA (Learning to Anchor)',
+      subtitle: '推进连续扩散语言模型',
+      problem: 'Action Token生成需高并行度，AR范式天然受限。Flow Map LM有两个缺陷：(1)中间状态脱离概率单纯形，(2)训练-推理不一致。',
+      method: '两个核心改动：<span class="highlight">Dirichlet分布替代Gaussian噪声</span>，保证中间状态始终为合法概率分布（simplex上）；<span class="highlight">Wrong-token Semantic Corruption</span>显式训练模型在被误导上下文中恢复正确答案。',
+      role: 'XLA中Action Token生成范式的底层探索。高并行度适配世界模型（同时预测多元素状态）、VLA动作生成（多关节协调）、支持test-time scaling。',
+      stats: [
+        { val: '20.12', label: 'GenPPL（FLM: 96.91）' },
+        { val: '128步', label: '即超越FLM 1024步' },
+        { val: 'Simplex', label: 'Euler步永远合法' }
+      ]
+    }
+  },
+  {
+    id: 'nanovla',
+    name: 'NanoVLA',
+    icon: '🤖',
+    layer: 'A',
+    layerLabel: 'A · 边缘部署',
+    angle: -20,
+    radius: 240,
+    colorLine: '#66bb6a',
+    nodeClass: 'node-a',
+    shortDesc: '2%参数，52x加速，边缘端实时',
+    detail: {
+      title: 'NanoVLA',
+      subtitle: '边缘端通用机器人策略 · arXiv 2510',
+      problem: '大规模VLA（如OpenVLA 7B）无法部署到Jetson Orin Nano等边缘设备。简单压缩参数量不能解决推理架构低效问题。',
+      method: '三大设计：<span class="highlight">Vision-Language Decoupling + Caching</span>（指令编码复用，仅视觉逐帧更新）、<span class="highlight">Long-Short Action Chunking</span>（长窗训练短窗执行）、<span class="highlight">Dynamic Routing</span>（贝叶斯路由按需升级骨干）。',
+      role: 'XLA A层"行为专家"落地的关键技术。解决从实验室到产品的最后一公里——在资源受限设备上实时运行完整感知→推理→动作流水线。',
+      stats: [
+        { val: '2%', label: '参数量（vs OpenVLA）' },
+        { val: '52x', label: '推理加速' },
+        { val: '≥SOTA', label: '性能不降反升' }
+      ]
+    }
+  }
+];
+
+const coreDetail = {
+  title: 'XLA 认知大模型',
+  subtitle: '小米具身智能 · 更多模态、更高效、更可控',
+  sections: [
+    { heading: 'X — 多模态认知输入', text: '支持雷达、麦克风、摄像头、LiDAR、GPS、互联网信息、机器人本体感知等多种输入模态。<span class="highlight">SpatioLM</span> 和 <span class="highlight">GDA</span> 从两条互补路线增强空间感知能力。' },
+    { heading: 'L — 高效的原生语言', text: '以 Latent CoT 和 Action Token 作为核心"语言"，基座模型为 Xiaomi MiMo-Embodied。<span class="highlight">OneVL</span> 实现一步潜空间推理，<span class="highlight">LTA</span> 探索并行扩散生成范式。' },
+    { heading: 'A — 拟人化的行为', text: '输出层涵盖行为、世界模型、行为专家、奖励函数、状态估计、强化学习，通过闭环训练持续迭代。<span class="highlight">NanoVLA</span> 将完整VLA能力部署到边缘设备。' }
+  ]
+};
+
+// ── Particle background ──
+const canvas = document.getElementById('bg');
+const ctx = canvas.getContext('2d');
+let particles = [];
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+for (let i = 0; i < 80; i++) {
+  particles.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    r: Math.random() * 1.5 + 0.5,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: (Math.random() - 0.5) * 0.3,
+    alpha: Math.random() * 0.3 + 0.05
+  });
+}
+
+function drawParticles() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  particles.forEach(p => {
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0) p.x = canvas.width;
+    if (p.x > canvas.width) p.x = 0;
+    if (p.y < 0) p.y = canvas.height;
+    if (p.y > canvas.height) p.y = 0;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${p.alpha})`;
+    ctx.fill();
+  });
+  requestAnimationFrame(drawParticles);
+}
+drawParticles();
+
+// ── Build scene ──
+const scene = document.getElementById('scene');
+const svgNS = 'http://www.w3.org/2000/svg';
+const connSvg = document.getElementById('connSvg');
+const cx = window.innerWidth / 2;
+const cy = window.innerHeight / 2;
+
+// Connection lines
+const lines = {};
+works.forEach(w => {
+  const rad = (w.angle * Math.PI) / 180;
+  const ex = cx + Math.cos(rad) * w.radius;
+  const ey = cy + Math.sin(rad) * w.radius;
+
+  const line = document.createElementNS(svgNS, 'line');
+  line.setAttribute('x1', cx);
+  line.setAttribute('y1', cy);
+  line.setAttribute('x2', cx);
+  line.setAttribute('y2', cy);
+  line.style.stroke = w.colorLine;
+  line.id = 'line-' + w.id;
+  line.dataset.tx = ex;
+  line.dataset.ty = ey;
+  connSvg.appendChild(line);
+  lines[w.id] = line;
+});
+
+// Work nodes
+const nodeEls = {};
+works.forEach(w => {
+  const rad = (w.angle * Math.PI) / 180;
+  const nx = cx + Math.cos(rad) * w.radius - 70;
+  const ny = cy + Math.sin(rad) * w.radius - 50;
+
+  const node = document.createElement('div');
+  node.className = `work-node ${w.nodeClass}`;
+  node.id = 'node-' + w.id;
+  node.style.left = nx + 'px';
+  node.style.top = ny + 'px';
+  node.innerHTML = `
+    <div class="icon">${w.icon}</div>
+    <div class="name">${w.name}</div>
+    <span class="layer-tag">${w.layerLabel}</span>
+    <div class="desc">${w.shortDesc}</div>
+  `;
+  node.addEventListener('click', () => showDetail(w));
+  node.addEventListener('mouseenter', () => {
+    lines[w.id].classList.add('active');
+  });
+  node.addEventListener('mouseleave', () => {
+    lines[w.id].classList.remove('active');
+  });
+  scene.appendChild(node);
+  nodeEls[w.id] = node;
+});
+
+// ── Intro animation ──
+const intro = document.getElementById('intro');
+setTimeout(() => {
+  intro.classList.add('hidden');
+}, 1200);
+
+// Staggered node entrance
+setTimeout(() => {
+  works.forEach((w, i) => {
+    setTimeout(() => {
+      nodeEls[w.id].classList.add('visible');
+      // Animate line
+      const line = lines[w.id];
+      line.setAttribute('x2', line.dataset.tx);
+      line.setAttribute('y2', line.dataset.ty);
+    }, i * 200);
+  });
+}, 1600);
+
+// ── Detail panel ──
+const detailPanel = document.getElementById('detailPanel');
+const detailContent = document.getElementById('detailContent');
+
+function showDetail(w) {
+  const d = w.detail;
+  detailContent.innerHTML = `
+    <h2>${d.title}</h2>
+    <div class="subtitle">${d.subtitle}</div>
+    <div class="section-title">问题</div>
+    <div class="body-text">${d.problem}</div>
+    <div class="section-title">核心方案</div>
+    <div class="body-text">${d.method}</div>
+    <div class="section-title">在 XLA 中的角色</div>
+    <div class="body-text">${d.role}</div>
+    <div class="section-title">关键指标</div>
+    <div class="stat-row">
+      ${d.stats.map(s => `<div class="stat"><div class="val">${s.val}</div><div class="label">${s.label}</div></div>`).join('')}
+    </div>
+  `;
+  detailPanel.classList.add('open');
+}
+
+function showCoreDetail() {
+  const c = coreDetail;
+  detailContent.innerHTML = `
+    <h2>${c.title}</h2>
+    <div class="subtitle">${c.subtitle}</div>
+    ${c.sections.map(s => `
+      <div class="section-title">${s.heading}</div>
+      <div class="body-text">${s.text}</div>
+    `).join('')}
+    <div class="section-title" style="margin-top:28px">技术叙事</div>
+    <div class="body-text">
+      从感知到行动的<span class="highlight">全链路效率革命</span>：感知侧（SpatioLM + GDA）双路线增强空间理解 → 推理侧（OneVL + LTA）压缩思考、并行表达 → 执行侧（NanoVLA）边缘端实时部署。
+    </div>
+  `;
+  detailPanel.classList.add('open');
+}
+
+function closeDetail() {
+  detailPanel.classList.remove('open');
+}
+
+// Close panel on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDetail();
+});
+
+// ── Handle resize ──
+window.addEventListener('resize', () => {
+  const ncx = window.innerWidth / 2;
+  const ncy = window.innerHeight / 2;
+
+  works.forEach(w => {
+    const rad = (w.angle * Math.PI) / 180;
+    const nx = ncx + Math.cos(rad) * w.radius - 70;
+    const ny = ncy + Math.sin(rad) * w.radius - 50;
+    nodeEls[w.id].style.left = nx + 'px';
+    nodeEls[w.id].style.top = ny + 'px';
+
+    const line = lines[w.id];
+    line.setAttribute('x1', ncx);
+    line.setAttribute('y1', ncy);
+    line.setAttribute('x2', ncx + Math.cos(rad) * w.radius);
+    line.setAttribute('y2', ncy + Math.sin(rad) * w.radius);
+    line.dataset.tx = ncx + Math.cos(rad) * w.radius;
+    line.dataset.ty = ncy + Math.sin(rad) * w.radius;
+  });
+
+  // Re-center core
+  const core = document.getElementById('core');
+  core.style.left = (ncx - 80) + 'px';
+  core.style.top = (ncy - 80) + 'px';
+});
+
+// Initial centering of core
+const core = document.getElementById('core');
+core.style.position = 'absolute';
+core.style.left = (cx - 80) + 'px';
+core.style.top = (cy - 80) + 'px';
+
+// SVG line animation (CSS transition via attribute change)
+const style = document.createElement('style');
+style.textContent = `
+  svg.connections line {
+    transition: x2 .6s cubic-bezier(.22,1,.36,1), y2 .6s cubic-bezier(.22,1,.36,1);
+  }
+`;
+document.head.appendChild(style);
+</script>
+</body>
+</html>
